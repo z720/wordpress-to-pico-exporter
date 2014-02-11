@@ -1,13 +1,13 @@
 <?php
 /*
-Plugin Name: WordPress to Jekyll Exporter
-Description: Exports WordPress posts, pages, and options as YAML files parsable by Jekyll
-Version: 1.3
-Author: Benjamin J. Balter
-Author URI: http://ben.balter.com
+Plugin Name: WordPress to Pico Exporter
+Description: Exports WordPress posts, pages, and options as YAML files parsable by Pico (based on WordPRess to Jekyll Exporter by Benjamin J. Balter  (https://github.com/benbalter/wordpress-to-jekyll-exporter)
+Version: 1.5
+Author: z720
+Author URI: http://z720.net
 License: GPLv3 or Later
 
-Copyright 2012-2013  Benjamin J. Balter  (email : Ben@Balter.com)
+Copyright 2012-2013 S. Erard
 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License, version 2, as
@@ -23,9 +23,9 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-class Jekyll_Export {
+class Pico_Export {
 
-  private $zip_folder = 'jekyll-export/'; //folder zip file extracts to
+  private $zip_folder = 'pico-export/'; //folder zip file extracts to
 
   public $rename_options = array( 'site', 'blog' ); //strings to strip from option keys on export
 
@@ -60,7 +60,7 @@ class Jekyll_Export {
     if ( get_current_screen()->id != 'export' )
       return;
 
-    if ( !isset( $_GET['type'] ) || $_GET['type'] != 'jekyll' )
+    if ( !isset( $_GET['type'] ) || $_GET['type'] != 'pico' )
       return;
 
     if ( !current_user_can( 'manage_options' ) )
@@ -77,7 +77,7 @@ class Jekyll_Export {
    */
   function register_menu() {
 
-    add_management_page( __( 'Export to Jekyll', 'jekyll-export' ), __( 'Export to Jekyll', 'jekyll-export' ), 'manage_options', 'export.php?type=jekyll' );
+    add_management_page( __( 'Export to Pico', 'pico-export' ), __( 'Export to Pico', 'pico-export' ), 'manage_options', 'export.php?type=pico' );
 
   }
 
@@ -100,16 +100,14 @@ class Jekyll_Export {
   function convert_meta( $post ) {
 
     $output = array(
-      'title'   => get_the_title( $post ),
-      'author'  => get_userdata( $post->post_author )->display_name,
-      'excerpt' => $post->post_excerpt,
-      'layout'  => get_post_type( $post ),
+      'Title'   => get_the_title( $post ),
+      'Author'  => get_userdata( $post->post_author )->display_name,
+      'Excerpt' => $post->post_excerpt,
+      'Template'  => get_post_type( $post ),
     );
 
-    //preserve exact permalink, since Jekyll doesn't support redirection
-    if ( 'page' != $post->post_type ) {
-      $output[ 'permalink' ] = str_replace( home_url(), '', get_permalink( $post ) );
-    }
+    //preserve exact permalink
+    $output[ 'permalink' ] = str_replace( home_url(), '', get_permalink( $post ) );
 
     //convert traditional post_meta values, hide hidden values
     foreach ( get_post_custom( $post->ID ) as $key => $value ) {
@@ -129,13 +127,13 @@ class Jekyll_Export {
    * Convert post taxonomies for export
    */
   function convert_terms( $post ) {
-
+// TODO: reformat as comma-separated list
     $output = array();
     foreach ( get_taxonomies( array( 'object_type' => array( get_post_type( $post ) ) ) ) as $tax ) {
 
       $terms = wp_get_post_terms( $post, $tax );
 
-      //convert tax name for Jekyll
+      //convert tax name for Pico
       switch ( $tax ) {
       case 'post_tag':
         $tax = 'tags';
@@ -179,6 +177,9 @@ class Jekyll_Export {
     global $post;
 
     foreach ( $this->get_posts() as $postID ) {
+      // Meta data
+      $output = "/*\n";
+
       $post = get_post( $postID );
       setup_postdata( $post );
 
@@ -186,16 +187,24 @@ class Jekyll_Export {
 
       // remove falsy values, which just add clutter
       foreach ( $meta as $key => $value ) {
-        if ( !is_numeric( $value ) && !$value )
+        if ( !is_numeric( $value ) && !$value ) {
           unset( $meta[ $key ] );
+        } else {
+          $key = ucfirst($key);
+          if( is_array( $value ) ) {
+            $value = implode( ', ', $value );
+          }
+          $output .= " $key: $value\n";
+        }
       }
 
       // Jekyll doesn't like word-wrapped permalinks
-      $output = Spyc::YAMLDump( $meta, false, 0 );
+      // $output = Spyc::YAMLDump( $meta, false, 0 );
 
-      $output .= "---\n";
+      $output .= "*/\n";
+      // Content
       $output .= $this->convert_content( $post );
-      $this->write( $output, $post );
+      $this->write( $output, $post, $meta[ 'permalink' ] );
     }
 
   }
@@ -228,7 +237,7 @@ class Jekyll_Export {
   function export() {
     global $wp_filesystem;
 
-    define( 'DOING_JEKYLL_EXPORT', true );
+    define( 'DOING_PICO_EXPORT', true );
 
     $this->require_classes();
 
@@ -237,8 +246,8 @@ class Jekyll_Export {
     WP_Filesystem();
 
     $temp_dir = get_temp_dir();
-    $this->dir = $temp_dir . 'wp-jekyll-' . md5( time() ) . '/';
-    $this->zip = $temp_dir . 'wp-jekyll.zip';
+    $this->dir = $temp_dir . 'wp-pico-' . md5( time() ) . '/';
+    $this->zip = $temp_dir . 'wp-pico.zip';
     $wp_filesystem->mkdir( $this->dir );
     $wp_filesystem->mkdir( $this->dir . '_posts/' );
     $wp_filesystem->mkdir( $this->dir . 'wp-content/' );
@@ -266,7 +275,7 @@ class Jekyll_Export {
       if ( substr( $key, 0, 1 ) == '_' )
         unset( $options[$key] );
 
-      //strip site and blog from key names, since it will become site. when in Jekyll
+      //strip site and blog from key names, since it will become site. when in Pico
       foreach ( $this->rename_options as $rename ) {
 
         $len = strlen( $rename );
@@ -299,17 +308,34 @@ class Jekyll_Export {
 
 
   /**
+   * Recusrsive mkdir
+   */
+  function mkdirrecursive( $path ) {
+    global $wp_filesystem;
+    $p = '';
+    foreach( explode( '/', $path ) as $folder ) {
+      $p .= $folder . '/';
+      $wp_filesystem->mkdir( $this->dir . '/' . $p );
+    }
+  }
+
+  /**
    * Write file to temp dir
    */
-  function write( $output, $post ) {
+  function write( $output, $post, $path ) {
 
     global $wp_filesystem;
 
-    if ( get_post_type( $post ) == 'page' ) {
+    if ( $path ) {
+      $this->mkdirrecursive( $path );
+      $filename = $path . '/index.md'; 
+    }/* elseif ( get_post_type( $post ) == 'page' ) {
       $wp_filesystem->mkdir( $this->dir . $post->post_name );
       $filename = $post->post_name . '/index.md';
     } else {
       $filename = '_posts/' . date( 'Y-m-d', strtotime( $post->post_date ) ) . '-' . $post->post_name . '.md';
+    }*/ else {
+      die($path);
     }
 
     $wp_filesystem->put_contents( $this->dir . $filename, $output );
@@ -369,7 +395,7 @@ class Jekyll_Export {
 
     //send headers
     @header( 'Content-Type: application/zip' );
-    @header( "Content-Disposition: attachment; filename=jekyll-export.zip" );
+    @header( "Content-Disposition: attachment; filename=pico-export.zip" );
     @header( 'Content-Length: ' . filesize( $this->zip ) );
 
     //read file
@@ -465,11 +491,11 @@ class Jekyll_Export {
 
 }
 
-$je = new Jekyll_Export();
+$je = new Pico_Export();
 
 if ( defined('WP_CLI') && WP_CLI ) {
   
-  class Jekyll_Export_Command extends WP_CLI_Command {
+  class Pico_Export_Command extends WP_CLI_Command {
 
     function __invoke() {
       global $je;
@@ -478,6 +504,6 @@ if ( defined('WP_CLI') && WP_CLI ) {
     }
   }
 
-  WP_CLI::add_command( 'jekyll-export', 'Jekyll_Export_Command' );
+  WP_CLI::add_command( 'pico-export', 'Pico_Export_Command' );
 
 }

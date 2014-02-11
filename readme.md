@@ -1,17 +1,17 @@
-WordPress to Jekyll Exporter
+WordPress to Pico Exporter
 ============================
 
-One-click WordPress plugin that converts all posts, pages, taxonomies, metadata, and settings to Markdown and YAML which can be dropped into Jekyll.
+One-click WordPress plugin that converts all posts, pages, taxonomies, metadata, and settings to Markdown which can be dropped into [Pico CMS](http://pico.dev7studios.com/).
 
 Features
 --------
 
-* Converts all posts, pages, and settings from WordPress for use in Jekyll
+* Converts all posts, pages, and settings from WordPress for use in Pico
 * Export what your users see, not what the database stores (runs post content through `the_content` filter prior to export, allowing third-party plugins to modify the output)
 * Converts all `post_content` to Markdown Extra (using Markdownify)
-* Converts all `post_meta` and fields within the `wp_posts` table to YAML front matter for parsing by Jekyll
+* Converts all `post_meta` and fields within the `wp_posts` table to meta data for parsing with Pico
 * Generates a `_config.yml` with all settings in the `wp_options` table
-* Outputs a single zip file with `_config.yml`, pages, and `_posts` folder containing `.md` files for each post in the proper Jekyll naming convention
+* Outputs a single zip file with `_config.yml`, pages, and `_posts` folder containing `.md` files for each post in the proper Pico CMS naming convention and file tree
 * No settings. Just a single click.
 
 Usage
@@ -20,7 +20,7 @@ Usage
 1. Place plugin in `/wp-content/plugins/` folder
 2. Make sure `extension=zip.so` line is uncommented in your `php.ini`
 3. Activate plugin in WordPress dashboard
-4. Select `Export to Jekyll` from the `Tools` menu
+4. Select `Export to Pico` from the `Tools` menu
 
 Command-line Usage
 ------------------
@@ -29,12 +29,12 @@ If you're having trouble with your web server timing out before the export is co
 
 It works just like the plugin, but produces the zipfile on STDOUT:
 
-    php jekyll-export-cli.php > jekyll-export.zip
+    php pico-export-cli.php > pico-export.zip
 
 Alternatively, if you have [WP-CLI](http://wp-cli.org) installed, you can run:
 
 ```
-wp jekyll-export > export.zip
+wp pico-export > export.zip
 ```
 
 The WP-CLI version will provide greater compatibility for alternate WordPress environments, such as when `wp-content` isn't in the usual location.
@@ -42,7 +42,14 @@ The WP-CLI version will provide greater compatibility for alternate WordPress en
 Changelog
 ---------
 
-**[View Past Releases](https://github.com/benbalter/wordpress-to-jekyll-exporter/tags)**
+**[View Past Releases](https://github.com/z720/wordpress-to-pico-exporter/tags)**
+
+### 1.5 
+
+* Initial Release for Pico Conversion
+
+ 
+**Previous history before fork from [wordpress-to-jekyll-exporter](https://github.com/benbalter/wordpress-to-jekyll-exporter/tags)**
 
 ### 1.4
 
