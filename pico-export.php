@@ -27,16 +27,7 @@ class Pico_Export {
 
   private $zip_folder = 'pico-export/'; //folder zip file extracts to
 
-  public $rename_options = array( 'site', 'blog' ); //strings to strip from option keys on export
-
-  public $options = array(  //array of wp_options value to convert to _config.yml
-    'name',
-    'description',
-    'url'
-  );
-
   public  $required_classes = array( 
-    'spyc' => '%pwd%/includes/spyc.php',
     'Markdownify\Parser' => '%pwd%/includes/markdownify/Parser.php',
     'Markdownify\Converter' => '%pwd%/includes/markdownify/Converter.php',
     'Markdownify\ConverterExtra' => '%pwd%/includes/markdownify/ConverterExtra.php',
@@ -107,8 +98,13 @@ class Pico_Export {
     );
 
     //preserve exact permalink
-    $output[ 'permalink' ] = str_replace( home_url(), '', get_permalink( $post ) );
+    $output[ 'Permalink' ] = str_replace( home_url(), '', get_permalink( $post ) );
 
+    //Preserve blog post status according to Pico blogging best practice
+    if ( 'post' == $post->post_type ) {
+      $output[ 'Date' ] = mysql2date( 'c', $post->post_date_gmt );
+    }
+    
     //convert traditional post_meta values, hide hidden values
     foreach ( get_post_custom( $post->ID ) as $key => $value ) {
 
@@ -127,7 +123,6 @@ class Pico_Export {
    * Convert post taxonomies for export
    */
   function convert_terms( $post ) {
-// TODO: reformat as comma-separated list
     $output = array();
     foreach ( get_taxonomies( array( 'object_type' => array( get_post_type( $post ) ) ) ) as $tax ) {
 
@@ -198,9 +193,6 @@ class Pico_Export {
         }
       }
 
-      // Jekyll doesn't like word-wrapped permalinks
-      // $output = Spyc::YAMLDump( $meta, false, 0 );
-
       $output .= "*/\n";
       // Content
       $output .= $this->convert_content( $post );
@@ -249,10 +241,7 @@ class Pico_Export {
     $this->dir = $temp_dir . 'wp-pico-' . md5( time() ) . '/';
     $this->zip = $temp_dir . 'wp-pico.zip';
     $wp_filesystem->mkdir( $this->dir );
-    $wp_filesystem->mkdir( $this->dir . '_posts/' );
-    $wp_filesystem->mkdir( $this->dir . 'wp-content/' );
-
-    $this->convert_options();
+    
     $this->convert_posts();
     $this->convert_uploads();
     $this->zip();
@@ -261,54 +250,8 @@ class Pico_Export {
 
   }
 
-
   /**
-   * Convert options table to _config.yml file
-   */
-  function convert_options() {
-
-    global $wp_filesystem;
-
-    $options = wp_load_alloptions();
-    foreach ( $options as $key => &$option ) {
-
-      if ( substr( $key, 0, 1 ) == '_' )
-        unset( $options[$key] );
-
-      //strip site and blog from key names, since it will become site. when in Pico
-      foreach ( $this->rename_options as $rename ) {
-
-        $len = strlen( $rename );
-        if ( substr( $key, 0, $len ) != $rename )
-          continue;
-
-        $this->rename_key( $options, $key, substr( $key, $len ) );
-
-      }
-
-      $option = maybe_unserialize( $option );
-
-    }
-
-    foreach ( $options as $key => $value ) {
-
-      if ( !in_array( $key, $this->options ) )
-        unset( $options[ $key ] );
-
-    }
-
-    $output = Spyc::YAMLDump( $options );
-
-    //strip starting "---"
-    $output = substr( $output, 4 );
-
-    $wp_filesystem->put_contents( $this->dir . '_config.yml', $output );
-
-  }
-
-
-  /**
-   * Recusrsive mkdir
+   * Recursive mkdir
    */
   function mkdirrecursive( $path ) {
     global $wp_filesystem;
@@ -328,14 +271,10 @@ class Pico_Export {
 
     if ( $path ) {
       $this->mkdirrecursive( $path );
-      $filename = $path . '/index.md'; 
-    }/* elseif ( get_post_type( $post ) == 'page' ) {
+      $filename = ltrim($path . '/index.md', '/');
+    } else {
       $wp_filesystem->mkdir( $this->dir . $post->post_name );
       $filename = $post->post_name . '/index.md';
-    } else {
-      $filename = '_posts/' . date( 'Y-m-d', strtotime( $post->post_date ) ) . '-' . $post->post_name . '.md';
-    }*/ else {
-      die($path);
     }
 
     $wp_filesystem->put_contents( $this->dir . $filename, $output );
@@ -378,7 +317,7 @@ class Pico_Export {
       }
 
       //make path within zip relative to zip base, not server root
-      $local_path = '/' . str_replace( $this->dir, $this->zip_folder, $path );
+      $local_path = ltrim( str_replace( $this->dir, $this->zip_folder, $path ), '/' );
 
       //add file
       $zip->addFile( realpath( $path ), $local_path );
