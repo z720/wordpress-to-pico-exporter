@@ -228,6 +228,7 @@ class Pico_Export {
    */
   function export() {
     global $wp_filesystem;
+    ob_start();
 
     define( 'DOING_PICO_EXPORT', true );
 
@@ -245,6 +246,7 @@ class Pico_Export {
     $this->convert_posts();
     $this->convert_uploads();
     $this->zip();
+    ob_end_clean();
     $this->send();
     $this->cleanup();
 
